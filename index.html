@@ -42,7 +42,7 @@
     /* ====== Touch controls overlay ====== */
     .touch-controls{position:absolute;left:0;right:0;bottom:8px;display:flex;justify-content:space-between;padding:8px 14px;pointer-events:none}
     .touch-controls .group{display:flex;gap:8px;pointer-events:auto}
-    .touch-controls button{width:64px;height:64px;border-radius:12px;border:none;background:rgba(255,255,255,0.06);backdrop-filter:blur(4px);font-weight:800;font-size:18px;color:var(--accent)}
+    .touch-controls button{width:80px;height:80px;border-radius:12px;border:none;background:rgba(255,255,255,0.06);backdrop-filter:blur(4px);font-weight:800;font-size:24px;color:var(--accent)}
     .touch-controls button:active{transform:scale(.98)}
     .touch-controls .invisible{opacity:.0001}
 
@@ -52,11 +52,11 @@
     /* mobile friendly zoom: shrink container but keep game internal scale */
     @media (max-width:900px){
       .game-box{width:100%;height:60vh;min-height:360px}
-      .touch-controls button{width:56px;height:56px}
+      .touch-controls button{width:70px;height:70px;font-size:20px}
     }
 
     @media (max-width:460px){
-      .touch-controls button{width:48px;height:48px}
+      .touch-controls button{width:60px;height:60px;font-size:18px}
     }
 
     /* small helper for messages */
@@ -90,7 +90,6 @@
             </div>
             <div class="group" id="rightGroup">
               <button id="jumpBtn">▲</button>
-              <button id="actionBtn">●</button>
             </div>
           </div>
         </div>
@@ -399,7 +398,6 @@
   const leftBtn = document.getElementById('leftBtn');
   const rightBtn = document.getElementById('rightBtn');
   const jumpBtn = document.getElementById('jumpBtn');
-  const actionBtn = document.getElementById('actionBtn');
   const touchControls = document.getElementById('touchControls');
 
   function setTouchVisible(v){
@@ -417,7 +415,7 @@
     btn.addEventListener('mouseup', end);
     btn.addEventListener('mouseleave', end);
   }
-  bindBtn(leftBtn,'ArrowLeft'); bindBtn(rightBtn,'ArrowRight'); bindBtn(jumpBtn,' '); bindBtn(actionBtn,'x');
+  bindBtn(leftBtn,'ArrowLeft'); bindBtn(rightBtn,'ArrowRight'); bindBtn(jumpBtn,' ');
 
   // ---------------------- PHYSICS & UTILS ----------------------
   function rectsOverlap(a,b){ return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y }
