@@ -1,0 +1,592 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>Jaswal Ghumdai</title>
+  <style>
+    /* ====== Basic page layout ====== */
+    :root{
+      --bg:#0b1220;
+      --panel:#0f1724;
+      --accent:#ffcc33;
+      --game-width:900px; /* design target width */
+      --game-height:520px; /* design target height */
+      --game-bg: url(''); /* put your background image URL here */
+    }
+    *{box-sizing:border-box}
+    body{margin:0;min-height:100vh;background:linear-gradient(180deg,#071021 0%, #0b1220 100%);color:#e6eef6;font-family:Inter, system-ui, Arial, sans-serif;display:flex;align-items:center;justify-content:center;padding:18px}
+    .container{max-width:1200px;width:100%}
+
+    header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+    header h1{font-size:20px;margin:0}
+    header .meta{font-size:13px;opacity:.9}
+
+    .instructions{background:rgba(255,255,255,0.03);padding:10px;border-radius:8px;margin-bottom:10px;font-size:14px}
+
+    /* ====== Game box ====== */
+    .game-wrap{display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap}
+    .game-column{flex:1 1 680px;display:flex;flex-direction:column;align-items:center}
+
+    .game-box{width:var(--game-width);height:var(--game-height);position:relative;background:var(--panel);border-radius:12px;overflow:hidden;border:3px solid rgba(255,255,255,0.04);box-shadow:0 12px 40px rgba(2,6,23,.7);display:flex;align-items:center;justify-content:center}
+
+    /* The actual game canvas is centered and scaled for mobile */
+    .screen{width:100%;height:100%;transform-origin:center center;display:block}
+
+    /* control area */
+    .controls-row{display:flex;gap:8px;margin-top:8px;align-items:center}
+    .btn{background:var(--accent);color:#051224;padding:8px 12px;border-radius:8px;border:none;font-weight:700;cursor:pointer}
+
+    .credits{font-size:12px;margin-top:8px;color:#a9b7c7}
+
+    /* ====== Touch controls overlay ====== */
+    .touch-controls{position:absolute;left:0;right:0;bottom:8px;display:flex;justify-content:space-between;padding:8px 14px;pointer-events:none}
+    .touch-controls .group{display:flex;gap:8px;pointer-events:auto}
+    .touch-controls button{width:64px;height:64px;border-radius:12px;border:none;background:rgba(255,255,255,0.06);backdrop-filter:blur(4px);font-weight:800;font-size:18px;color:var(--accent)}
+    .touch-controls button:active{transform:scale(.98)}
+    .touch-controls .invisible{opacity:.0001}
+
+    /* fullscreen toggle icon */
+    .fs-toggle{position:absolute;top:10px;right:10px;background:rgba(255,255,255,0.04);border-radius:8px;padding:6px 8px;cursor:pointer;z-index:50}
+
+    /* mobile friendly zoom: shrink container but keep game internal scale */
+    @media (max-width:900px){
+      .game-box{width:100%;height:60vh;min-height:360px}
+      .touch-controls button{width:56px;height:56px}
+    }
+
+    @media (max-width:460px){
+      .touch-controls button{width:48px;height:48px}
+    }
+
+    /* small helper for messages */
+    .hud{position:absolute;left:12px;top:12px;font-weight:700;background:rgba(2,6,23,.45);padding:6px 8px;border-radius:8px}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Jaswal Ghumdai</h1>
+      <div class="meta">Developed by rstechzen : 9808942229</div>
+    </header>
+
+    <div class="instructions">
+      <strong>How to play</strong> — Desktop: arrow keys to move, Space to jump. Mobile / Tablet: use the on-screen buttons. You have 3 lives per game. There is a fullscreen mode that expands only the game box so you can play comfortably on any device. To add new levels, edit the <code>levels</code> array inside the script (see comments) or load an external JSON file named <code>levels.json</code>.
+    </div>
+
+    <div class="game-wrap">
+      <div class="game-column">
+        <div id="gameBox" class="game-box" role="application" aria-label="Jaswal Ghumdai game box">
+          <div class="fs-toggle" id="fsToggle" title="Toggle game fullscreen">⤢</div>
+          <div class="hud" id="hud">Level 1 — Score: 0 — Lives: 3</div>
+          <!-- The canvas where game draws -->
+          <canvas id="screen" class="screen" width="900" height="520"></canvas>
+
+          <!-- touch controls (appear on touch devices) -->
+          <div class="touch-controls" id="touchControls">
+            <div class="group" id="leftGroup">
+              <button id="leftBtn">◀</button>
+              <button id="rightBtn">▶</button>
+            </div>
+            <div class="group" id="rightGroup">
+              <button id="jumpBtn">▲</button>
+              <button id="actionBtn">●</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="controls-row">
+          <button id="startBtn" class="btn">Start / Restart</button>
+          <button id="muteBtn" class="btn">Mute</button>
+        </div>
+
+        <div class="credits">Background: set your own image by editing CSS variable <code>--game-bg</code> or drop an image into the .game-box via CSS. Add or edit levels in the <code>levels</code> JSON in the script (see comments).</div>
+      </div>
+
+      <!-- right column: small helper / level info -->
+      <div style="width:280px;min-width:220px">
+        <div style="background:rgba(255,255,255,0.03);padding:12px;border-radius:10px">
+          <h3 style="margin-top:0">Level editor notes</h3>
+          <ol style="padding-left:18px;font-size:14px">
+            <li>Levels are defined in the <code>levels</code> array inside the HTML (or an external <code>levels.json</code>).</li>
+            <li>Each level uses: <code>tiles</code> (platforms), <code>coins</code>, <code>enemies</code>, <code>player</code> start.</li>
+            <li>To add after 10 levels simply append objects to the array and increment <code>levelCount</code>.</li>
+            <li>Tile coordinates are in pixels relative to the top-left of the level world.</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+  /*
+    Jaswal Ghumdai - single-file minimal platformer engine
+    - Responsive: scales to container and accepts touch or keyboard input
+    - Fullscreen: toggles fullscreen for #gameBox only
+    - Background image: edit CSS variable --game-bg at top of file
+    - Levels: edit `levels` array below. To switch to external JSON, fetch 'levels.json' instead.
+    - To add new levels: copy an existing level object and change tile positions/goal
+    - Lives: Player has 3 lives per game. Score persists across levels but resets to 0 when all lives are lost.
+  */
+
+  // ---------------------- LEVEL DATA ----------------------
+  const levels = [
+    // LEVEL 1
+    {
+      id:1, name:'Level 1', width:2000, height:520,
+      player:{x:60,y:360},
+      tiles:[
+        [0,480,2000,40],        // ground
+        [200,400,160,24],
+        [420,340,160,24],
+        [720,300,120,24]
+      ],
+      coins:[{x:230,y:360},{x:450,y:300},{x:760,y:260}],
+      enemies:[{x:900,y:440,dir:-1}],
+      goal:{x:1800,y:420,w:40,h:80}
+    },
+    // LEVEL 2
+    {
+      id:2, name:'Level 2', width:2500, height:520,
+      player:{x:60,y:360},
+      tiles:[
+        [0,480,2500,40],
+        [300,420,160,24],
+        [700,360,160,24],
+        [1100,300,160,24],
+        [1600,260,160,24]
+      ],
+      coins:[{x:320,y:380},{x:720,y:320},{x:1120,y:260},{x:1650,y:220}],
+      enemies:[{x:800,y:440,dir:-1},{x:1500,y:440,dir:1}],
+      goal:{x:2300,y:420,w:40,h:80}
+    },
+    // LEVEL 3
+    {
+      id:3, name:'Level 3', width:2800, height:520,
+      player:{x:60,y:360},
+      tiles:[
+        [0,480,2800,40],
+        [400,420,140,24],
+        [600,360,140,24],
+        [800,300,140,24],
+        [1000,240,140,24],
+        [1400,300,140,24],
+        [1700,360,140,24]
+      ],
+      coins:[
+        {x:420,y:380},{x:620,y:320},{x:820,y:260},
+        {x:1020,y:200},{x:1720,y:320}
+      ],
+      enemies:[
+        {x:900,y:440,dir:-1},{x:1300,y:440,dir:1},{x:1900,y:440,dir:-1}
+      ],
+      goal:{x:2600,y:420,w:40,h:80}
+    },
+    // LEVEL 4
+    {
+      id:4, name:'Level 4', width:3000, height:520,
+      player:{x:60,y:360},
+      tiles:[
+        [0,480,3000,40],
+        [500,420,160,24],
+        [800,380,160,24],
+        [1100,340,160,24],
+        [1400,300,160,24],
+        [1800,260,160,24],
+        [2200,220,160,24]
+      ],
+      coins:[
+        {x:520,y:380},{x:820,y:340},{x:1120,y:300},
+        {x:1420,y:260},{x:1820,y:220},{x:2220,y:180}
+      ],
+      enemies:[
+        {x:700,y:440,dir:1},{x:1200,y:440,dir:-1},
+        {x:1600,y:440,dir:1},{x:2000,y:440,dir:-1}
+      ],
+      goal:{x:2800,y:420,w:40,h:80}
+    },
+    // LEVEL 5
+    {
+      id:5, name:'Level 5', width:3500, height:520,
+      player:{x:60,y:360},
+      tiles:[
+        [0,480,3500,40],
+        [600,420,160,24],
+        [1000,360,160,24],
+        [1400,300,160,24],
+        [1800,240,160,24],
+        [2200,300,160,24],
+        [2600,360,160,24],
+        [3000,420,160,24]
+      ],
+      coins:[
+        {x:620,y:380},{x:1020,y:320},{x:1420,y:260},
+        {x:1820,y:200},{x:2220,y:260},{x:2620,y:320},
+        {x:3020,y:380}
+      ],
+      enemies:[
+        {x:800,y:440,dir:-1},{x:1200,y:440,dir:1},
+        {x:1600,y:440,dir:-1},{x:2000,y:440,dir:1},
+        {x:2400,y:440,dir:-1},{x:2800,y:440,dir:1}
+      ],
+      goal:{x:3300,y:420,w:40,h:80}
+    },
+    // LEVEL 6
+    {
+      id:6, name:'Level 6', width:3800, height:520,
+      player:{x:60,y:360},
+      tiles:[
+        [0,480,3800,40],
+        [700,420,160,24],
+        [1100,360,160,24],
+        [1500,300,160,24],
+        [1900,260,160,24],
+        [2300,220,160,24],
+        [2700,280,160,24],
+        [3100,340,160,24]
+      ],
+      coins:[
+        {x:720,y:380},{x:1120,y:320},{x:1520,y:260},
+        {x:1920,y:220},{x:2320,y:180},{x:2720,y:240},{x:3120,y:300}
+      ],
+      enemies:[
+        {x:900,y:440,dir:-1},{x:1400,y:440,dir:1},
+        {x:1800,y:440,dir:-1},{x:2200,y:440,dir:1},{x:2600,y:440,dir:-1}
+      ],
+      goal:{x:3600,y:420,w:40,h:80}
+    },
+    // LEVEL 7
+    {
+      id:7, name:'Level 7', width:4200, height:520,
+      player:{x:60,y:360},
+      tiles:[
+        [0,480,4200,40],
+        [800,420,120,24],[1000,360,120,24],[1200,300,120,24],
+        [1600,260,160,24],[2000,220,160,24],
+        [2500,280,160,24],[2900,340,160,24],[3300,400,160,24]
+      ],
+      coins:[
+        {x:820,y:380},{x:1020,y:320},{x:1220,y:260},
+        {x:1620,y:220},{x:2020,y:180},{x:2520,y:240},
+        {x:2920,y:300},{x:3320,y:360}
+      ],
+      enemies:[
+        {x:900,y:440,dir:1},{x:1300,y:440,dir:-1},
+        {x:1700,y:440,dir:1},{x:2100,y:440,dir:-1},
+        {x:2600,y:440,dir:1},{x:3000,y:440,dir:-1}
+      ],
+      goal:{x:4000,y:420,w:40,h:80}
+    },
+    // LEVEL 8
+    {
+      id:8, name:'Level 8', width:4600, height:520,
+      player:{x:60,y:360},
+      tiles:[
+        [0,480,4600,40],
+        [900,420,140,24],[1200,360,140,24],[1500,300,140,24],
+        [1900,240,140,24],[2300,280,140,24],[2700,340,140,24],
+        [3100,380,140,24],[3500,320,140,24],[3900,260,140,24]
+      ],
+      coins:[
+        {x:920,y:380},{x:1220,y:320},{x:1520,y:260},
+        {x:1920,y:200},{x:2320,y:240},{x:2720,y:300},
+        {x:3120,y:340},{x:3520,y:280},{x:3920,y:220}
+      ],
+      enemies:[
+        {x:1000,y:440,dir:-1},{x:1600,y:440,dir:1},
+        {x:2000,y:440,dir:-1},{x:2400,y:440,dir:1},
+        {x:2800,y:440,dir:-1},{x:3200,y:440,dir:1},{x:3600,y:440,dir:-1}
+      ],
+      goal:{x:4400,y:420,w:40,h:80}
+    },
+    // LEVEL 9
+    {
+      id:9, name:'Level 9', width:5000, height:520,
+      player:{x:60,y:360},
+      tiles:[
+        [0,480,5000,40],
+        [1000,420,160,24],[1400,360,160,24],[1800,300,160,24],
+        [2200,240,160,24],[2600,280,160,24],[3000,340,160,24],
+        [3400,380,160,24],[3800,320,160,24],[4200,260,160,24]
+      ],
+      coins:[
+        {x:1020,y:380},{x:1420,y:320},{x:1820,y:260},
+        {x:2220,y:200},{x:2620,y:240},{x:3020,y:300},
+        {x:3420,y:340},{x:3820,y:280},{x:4220,y:220}
+      ],
+      enemies:[
+        {x:1200,y:440,dir:1},{x:1600,y:440,dir:-1},
+        {x:2000,y:440,dir:1},{x:2400,y:440,dir:-1},
+        {x:2800,y:440,dir:1},{x:3200,y:440,dir:-1},
+        {x:3600,y:440,dir:1},{x:4000,y:440,dir:-1}
+      ],
+      goal:{x:4800,y:420,w:40,h:80}
+    },
+    // LEVEL 10
+    {
+      id:10, name:'Level 10', width:5500, height:520,
+      player:{x:60,y:360},
+      tiles:[
+        [0,480,5500,40],
+        [1200,420,140,24],[1500,360,140,24],[1800,300,140,24],
+        [2200,240,140,24],[2600,280,140,24],[3000,340,140,24],
+        [3400,380,140,24],[3800,320,140,24],[4200,260,140,24],
+        [4600,300,140,24],[5000,360,140,24]
+      ],
+      coins:[
+        {x:1220,y:380},{x:1520,y:320},{x:1820,y:260},
+        {x:2220,y:200},{x:2620,y:240},{x:3020,y:300},
+        {x:3420,y:340},{x:3820,y:280},{x:4220,y:220},
+        {x:4620,y:260},{x:5020,y:320}
+      ],
+      enemies:[
+        {x:1300,y:440,dir:-1},{x:1700,y:440,dir:1},
+        {x:2100,y:440,dir:-1},{x:2500,y:440,dir:1},
+        {x:2900,y:440,dir:-1},{x:3300,y:440,dir:1},
+        {x:3700,y:440,dir:-1},{x:4100,y:440,dir:1},
+        {x:4500,y:440,dir:-1},{x:4900,y:440,dir:1}
+      ],
+      goal:{x:5300,y:420,w:40,h:80}
+    }
+  ];
+
+  // ---------------------- CONFIG ----------------------
+  const canvas = document.getElementById('screen');
+  const ctx = canvas.getContext('2d');
+  let currentLevelIndex = 0;
+  let score = 0;
+  let lives = 3;
+  let keys = {};
+  let isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints>0;
+
+  // scale the internal canvas to look sharp on high DPI
+  function resizeCanvas(){
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = parseInt(window.getComputedStyle(canvas).width) * dpr;
+    canvas.height = parseInt(window.getComputedStyle(canvas).height) * dpr;
+    canvas.style.width = window.getComputedStyle(canvas).width;
+    canvas.style.height = window.getComputedStyle(canvas).height;
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+  window.addEventListener('resize', resizeCanvas);
+
+  // ---------------------- GAME STATE ----------------------
+  const state = {
+    player:{x:0,y:0,w:36,h:46,vx:0,vy:0,onGround:false},
+    tiles:[],coins:[],enemies:[],goal:null,camX:0
+  };
+
+  function loadLevel(idx, resetScore=false){
+    const lvl = levels[idx];
+    if(!lvl) return;
+    if(resetScore) score = 0;
+    state.player.x = lvl.player.x; state.player.y = lvl.player.y; state.player.vx = 0; state.player.vy = 0;
+    state.tiles = lvl.tiles.map(t=>({x:t[0],y:t[1],w:t[2],h:t[3]}));
+    state.coins = lvl.coins.map(c=>({x:c.x,y:c.y,w:12,h:12,collected:false}));
+    state.enemies = lvl.enemies.map(e=>({x:e.x,y:e.y,w:36,h:36,dir:e.dir||-1}));
+    state.goal = lvl.goal;
+    state.worldW = lvl.width; state.worldH = lvl.height;
+    document.getElementById('hud').textContent = `${lvl.name} — Score: ${score} — Lives: ${lives}`;
+    resizeCanvas();
+  }
+
+  // ---------------------- INPUT ----------------------
+  window.addEventListener('keydown',e=>{keys[e.key]=true});
+  window.addEventListener('keyup',e=>{keys[e.key]=false});
+
+  // touch buttons wiring
+  const leftBtn = document.getElementById('leftBtn');
+  const rightBtn = document.getElementById('rightBtn');
+  const jumpBtn = document.getElementById('jumpBtn');
+  const actionBtn = document.getElementById('actionBtn');
+  const touchControls = document.getElementById('touchControls');
+
+  function setTouchVisible(v){
+    touchControls.style.display = v? 'flex' : 'none';
+  }
+  setTouchVisible(isTouchDevice);
+
+  function bindBtn(btn, onPressKey){
+    let down=false;
+    const start = (e)=>{ e.preventDefault(); down=true; keys[onPressKey]=true };
+    const end = (e)=>{ e.preventDefault(); down=false; keys[onPressKey]=false };
+    btn.addEventListener('touchstart', start, {passive:false});
+    btn.addEventListener('touchend', end);
+    btn.addEventListener('mousedown', start);
+    btn.addEventListener('mouseup', end);
+    btn.addEventListener('mouseleave', end);
+  }
+  bindBtn(leftBtn,'ArrowLeft'); bindBtn(rightBtn,'ArrowRight'); bindBtn(jumpBtn,' '); bindBtn(actionBtn,'x');
+
+  // ---------------------- PHYSICS & UTILS ----------------------
+  function rectsOverlap(a,b){ return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y }
+
+  function update(dt){
+    const p = state.player;
+    const speed = 200;
+    // horizontal input
+    let move = 0;
+    if(keys['ArrowLeft']) move -= 1;
+    if(keys['ArrowRight']) move += 1;
+    const jumpKey = keys[' '] || keys['Spacebar'] || keys['w'] || keys['W'] || keys['ArrowUp'];
+
+    p.vx = move * speed;
+    // apply gravity
+    p.vy += 1000 * dt;
+    // jump
+    if(jumpKey && p.onGround){ p.vy = -420; p.onGround=false }
+    // integrate
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+
+    // simple collision with tiles
+    p.onGround = false;
+    for (const t of state.tiles) {
+      if (rectsOverlap(p, t)) {
+        const pCenterX = p.x + p.w / 2;
+        const pCenterY = p.y + p.h / 2;
+        const tCenterX = t.x + t.w / 2;
+        const tCenterY = t.y + t.h / 2;
+
+        const overlapX = pCenterX - tCenterX;
+        const overlapY = pCenterY - tCenterY;
+        const halfW = (p.w + t.w) / 2;
+        const halfH = (p.h + t.h) / 2;
+
+        const absOverlapX = Math.abs(overlapX);
+        const absOverlapY = Math.abs(overlapY);
+
+        const penetrationX = halfW - absOverlapX;
+        const penetrationY = halfH - absOverlapY;
+
+        if (penetrationX > 0 && penetrationY > 0) {
+          if (penetrationX < penetrationY) {
+            if (overlapX > 0) {
+              p.x += penetrationX;
+            } else {
+              p.x -= penetrationX;
+            }
+            p.vx = 0;
+          } else {
+            if (overlapY > 0) {
+              p.y += penetrationY;
+              p.vy = Math.max(0, p.vy);
+            } else {
+              p.y -= penetrationY;
+              p.vy = 0;
+              p.onGround = true;
+            }
+          }
+        }
+      }
+    }
+
+    // coin collection
+    for(const c of state.coins){
+      if(!c.collected && rectsOverlap({x:p.x+6,y:p.y+6,w:p.w-12,h:p.h-12}, c)){
+        c.collected = true; score += 10; document.getElementById('hud').textContent = `${levels[currentLevelIndex].name} — Score: ${score} — Lives: ${lives}`;
+      }
+    }
+
+    // enemies simple patrol
+    for(const e of state.enemies){
+      e.x += e.dir * 80 * dt;
+      if(e.x < 0 || e.x > state.worldW - e.w) e.dir *= -1;
+      if(rectsOverlap(p,e)){
+        if(p.vy > 100){ // stomp
+          e.dead = true; p.vy = -180; score += 20; document.getElementById('hud').textContent = `${levels[currentLevelIndex].name} — Score: ${score} — Lives: ${lives}`;
+        } else {
+          lives -= 1;
+          if(lives <= 0){
+            lives = 3;
+            currentLevelIndex = 0;
+            loadLevel(currentLevelIndex, true); // Reset score when all lives are lost
+          } else {
+            loadLevel(currentLevelIndex); // Keep score, just reload current level
+          }
+          return;
+        }
+      }
+    }
+    state.enemies = state.enemies.filter(e=>!e.dead);
+
+    // goal check
+    if(rectsOverlap(p,state.goal)){
+      currentLevelIndex = Math.min(currentLevelIndex+1, levels.length-1);
+      loadLevel(currentLevelIndex); // Keep score when advancing levels
+    }
+
+    // camera follow with some smoothing
+    const viewW = canvas.clientWidth; const minCamX = 0; const maxCamX = Math.max(0,state.worldW - viewW);
+    const targetCam = p.x - viewW/2 + p.w/2; state.camX += (targetCam - state.camX) * Math.min(1, 6*dt);
+    state.camX = Math.max(minCamX, Math.min(maxCamX, state.camX));
+  }
+
+  function draw(){
+    const cw = canvas.clientWidth; const ch = canvas.clientHeight;
+    ctx.clearRect(0,0,cw,ch);
+
+    // draw background if provided
+    const bgURL = getComputedStyle(document.documentElement).getPropertyValue('--game-bg').trim();
+    if(bgURL && bgURL.length>0){
+      ctx.fillStyle = '#0b1220'; ctx.fillRect(0,0,cw,ch);
+    } else {
+      ctx.fillStyle = '#0b1220'; ctx.fillRect(0,0,cw,ch);
+    }
+
+    ctx.save();
+    ctx.translate(-state.camX,0);
+
+    // draw tiles
+    ctx.fillStyle = '#2b3650';
+    for(const t of state.tiles){ ctx.fillRect(t.x, t.y, t.w, t.h) }
+
+    // draw coins
+    for(const c of state.coins){ if(!c.collected){ ctx.beginPath(); ctx.fillStyle='#ffd24d'; ctx.arc(c.x+6,c.y+6,6,0,Math.PI*2); ctx.fill() }}
+
+    // draw enemies
+    for(const e of state.enemies){ ctx.fillStyle = '#d24d4d'; ctx.fillRect(e.x,e.y,e.w,e.h) }
+
+    // draw goal
+    if(state.goal){ ctx.fillStyle = '#44d27a'; ctx.fillRect(state.goal.x, state.goal.y, state.goal.w, state.goal.h) }
+
+    // draw player
+    const p = state.player; ctx.fillStyle = '#ffffff'; ctx.fillRect(p.x, p.y, p.w, p.h);
+
+    ctx.restore();
+  }
+
+  // main loop
+  let last = performance.now();
+  function loop(now){
+    const dt = Math.min(0.05, (now - last) / 1000); last = now; update(dt); draw(); requestAnimationFrame(loop);
+  }
+
+  // start/reset button
+  document.getElementById('startBtn').addEventListener('click', ()=>{ lives = 3; loadLevel(0, true); });
+
+  // fullscreen handling (only the .game-box element)
+  const fsToggle = document.getElementById('fsToggle');
+  const gameBox = document.getElementById('gameBox');
+  function isFull() { return document.fullscreenElement === gameBox }
+  fsToggle.addEventListener('click', async ()=>{
+    try{
+      if(!isFull()) await gameBox.requestFullscreen(); else await document.exitFullscreen();
+    }catch(e){ console.warn('Fullscreen failed',e) }
+  });
+
+  // show/hide touch buttons based on device and optional user preference
+  function applyTouchMode(){
+    setTouchVisible(isTouchDevice);
+  }
+  applyTouchMode();
+
+  // initial load and loop start
+  loadLevel(0); requestAnimationFrame(loop);
+
+  // hint for user to change background CSS variable in runtime
+  // Example to set a background image from JS: document.documentElement.style.setProperty('--game-bg', "url('your-image.jpg')")
+  </script>
+</body>
+</html>
