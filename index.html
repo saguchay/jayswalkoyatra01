@@ -12,8 +12,9 @@
       --accent:#ffcc33;
       --game-width:900px; /* design target width */
       --game-height:520px; /* design target height */
-      --game-bg: url(''); /* put your background image URL here */
+      --game-bg: url('images/bgimage1.jpg'); /* put your background image URL here */
     }
+
     *{box-sizing:border-box}
     body{margin:0;min-height:100vh;background:linear-gradient(180deg,#071021 0%, #0b1220 100%);color:#e6eef6;font-family:Inter, system-ui, Arial, sans-serif;display:flex;align-items:center;justify-content:center;padding:18px}
     .container{max-width:1200px;width:100%}
@@ -71,7 +72,7 @@
     </header>
 
     <div class="instructions">
-      <strong>How to play</strong> — Desktop: arrow keys to move, Space to jump. Mobile / Tablet: use the on-screen buttons. You have 3 lives per game. There is a fullscreen mode that expands only the game box so you can play comfortably on any device. To add new levels, edit the <code>levels</code> array inside the script (see comments) or load an external JSON file named <code>levels.json</code>.
+    डेस्कटपमा Arrow Keys प्रयोग गरी चलाउनुहोस् र Space Key प्रयोग गरी जम्प गर्नुहोस्। मोबाइल वा ट्याब्लेटमा स्क्रिनमा देखिने बटनहरू प्रयोग गर्नुहोस्। प्रत्येक खेलमा तपाईंलाई ३ वटा जीवन दिइनेछ। खेललाई सजिलै खेल्नका लागि फुलस्क्रिन मोड प्रयोग गर्दा केवल खेलको बक्स ठूलो हुनेछ।
     </div>
 
     <div class="game-wrap">
@@ -105,17 +106,17 @@
       <!-- right column: small helper / level info -->
       <div style="width:280px;min-width:220px">
         <div style="background:rgba(255,255,255,0.03);padding:12px;border-radius:10px">
-          <h3 style="margin-top:0">Level editor notes</h3>
+          <h3 style="margin-top:0">Jaswal City Tour Gardai xa</h3>
           <ol style="padding-left:18px;font-size:14px">
-            <li>Levels are defined in the <code>levels</code> array inside the HTML (or an external <code>levels.json</code>).</li>
-            <li>Each level uses: <code>tiles</code> (platforms), <code>coins</code>, <code>enemies</code>, <code>player</code> start.</li>
-            <li>To add after 10 levels simply append objects to the array and increment <code>levelCount</code>.</li>
-            <li>Tile coordinates are in pixels relative to the top-left of the level world.</li>
+            <li>जसवाललाई सहयोग गर्नुहोस् र खेल (Game) पूर्ण बनाउन साथ दिनुहोस्।</li>
+  <li>खेलमा नियमित रूपमा त्रुटि सुधार (Error Update) र स्तर (Level) उन्नति हुँदै जानेछ।</li>
+  <li>TikTok र Facebook मा <b>Rstechzen</b> पेजमा Follow, Like र Comment गरेर साथ दिनुहोस्।</li>
+  <li>तपाईँहरूको Website वा Apps बनाउन आवश्यक परेमा सम्पर्क गर्नुहोस्।</li>
+  <li>Social Media Marketing Course सिक्न चाहनुहुन्छ भने पनि सम्पर्क गर्न सक्नुहुन्छ।</li>
           </ol>
         </div>
       </div>
     </div>
-
   </div>
 
   <script>
@@ -124,6 +125,7 @@
     - Responsive: scales to container and accepts touch or keyboard input
     - Fullscreen: toggles fullscreen for #gameBox only
     - Background image: edit CSS variable --game-bg at top of file
+    - Player image: uses images/player.png for player sprite
     - Levels: edit `levels` array below. To switch to external JSON, fetch 'levels.json' instead.
     - To add new levels: copy an existing level object and change tile positions/goal
     - Lives: Player has 3 lives per game. Score persists across levels but resets to 0 when all lives are lost.
@@ -359,6 +361,10 @@
   let keys = {};
   let isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints>0;
 
+  // Load player image
+  const playerImage = new Image();
+  playerImage.src = 'images/players.ico';
+
   // scale the internal canvas to look sharp on high DPI
   function resizeCanvas(){
     const dpr = window.devicePixelRatio || 1;
@@ -522,49 +528,70 @@
   }
 
   function draw(){
-    const cw = canvas.clientWidth; const ch = canvas.clientHeight;
-    ctx.clearRect(0,0,cw,ch);
+    const cw = canvas.clientWidth;
+    const ch = canvas.clientHeight;
+    ctx.clearRect(0, 0, cw, ch);
 
-    // draw background if provided
+    // Draw background image if provided
     const bgURL = getComputedStyle(document.documentElement).getPropertyValue('--game-bg').trim();
-    if(bgURL && bgURL.length>0){
-      ctx.fillStyle = '#0b1220'; ctx.fillRect(0,0,cw,ch);
+    if (bgURL && bgURL !== 'none' && bgURL !== '') {
+      const bgImage = new Image();
+      const cleanURL = bgURL.replace(/^url\(['"](.+)['"]\)/, '$1');
+      bgImage.src = cleanURL;
+      if (bgImage.complete) {
+        ctx.drawImage(bgImage, -state.camX, 0, state.worldW, ch);
+      } else {
+        bgImage.onload = () => {
+          ctx.drawImage(bgImage, -state.camX, 0, state.worldW, ch);
+        };
+      }
     } else {
-      ctx.fillStyle = '#0b1220'; ctx.fillRect(0,0,cw,ch);
+      ctx.fillStyle = '#0b1220';
+      ctx.fillRect(0, 0, cw, ch);
     }
 
     ctx.save();
-    ctx.translate(-state.camX,0);
+    ctx.translate(-state.camX, 0);
 
-    // draw tiles
+    // Draw tiles
     ctx.fillStyle = '#2b3650';
     for(const t of state.tiles){ ctx.fillRect(t.x, t.y, t.w, t.h) }
 
-    // draw coins
+    // Draw coins
     for(const c of state.coins){ if(!c.collected){ ctx.beginPath(); ctx.fillStyle='#ffd24d'; ctx.arc(c.x+6,c.y+6,6,0,Math.PI*2); ctx.fill() }}
 
-    // draw enemies
+    // Draw enemies
     for(const e of state.enemies){ ctx.fillStyle = '#d24d4d'; ctx.fillRect(e.x,e.y,e.w,e.h) }
 
-    // draw goal
+    // Draw goal
     if(state.goal){ ctx.fillStyle = '#44d27a'; ctx.fillRect(state.goal.x, state.goal.y, state.goal.w, state.goal.h) }
 
-    // draw player
-    const p = state.player; ctx.fillStyle = '#ffffff'; ctx.fillRect(p.x, p.y, p.w, p.h);
+    // Draw player
+    const p = state.player;
+    if (playerImage.complete) {
+      ctx.drawImage(playerImage, p.x, p.y, p.w, p.h);
+    } else {
+      playerImage.onload = () => {
+        ctx.drawImage(playerImage, p.x, p.y, p.w, p.h);
+      };
+      // Fallback to rectangle if image not loaded
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(p.x, p.y, p.w, p.h);
+    }
 
     ctx.restore();
   }
 
-  // main loop
+  // Main loop
   let last = performance.now();
   function loop(now){
     const dt = Math.min(0.05, (now - last) / 1000); last = now; update(dt); draw(); requestAnimationFrame(loop);
   }
 
-  // start/reset button
+  // Start/reset button
   document.getElementById('startBtn').addEventListener('click', ()=>{ lives = 3; loadLevel(0, true); });
 
-  // fullscreen handling (only the .game-box element)
+  // Fullscreen handling (only the .game-box element)
   const fsToggle = document.getElementById('fsToggle');
   const gameBox = document.getElementById('gameBox');
   function isFull() { return document.fullscreenElement === gameBox }
@@ -574,17 +601,18 @@
     }catch(e){ console.warn('Fullscreen failed',e) }
   });
 
-  // show/hide touch buttons based on device and optional user preference
+  // Show/hide touch buttons based on device and optional user preference
   function applyTouchMode(){
     setTouchVisible(isTouchDevice);
   }
   applyTouchMode();
 
-  // initial load and loop start
+  // Initial load and loop start
   loadLevel(0); requestAnimationFrame(loop);
 
-  // hint for user to change background CSS variable in runtime
-  // Example to set a background image from JS: document.documentElement.style.setProperty('--game-bg', "url('your-image.jpg')")
+  // Hint for user to change background or player image in runtime
+  // Example to set a background image: document.documentElement.style.setProperty('--game-bg', "url('new-image.jpg')")
+  // Example to set a player image: playerImage.src = 'new-player.png';
   </script>
 </body>
 </html>
